@@ -1,0 +1,10 @@
+apiVersion: v2
+name: freeit-keycloak
+description: Keycloak IdP for a freeit company cluster (E1.3).
+type: application
+version: 0.1.0
+appVersion: "24.0.4"
+dependencies:
+  - name: keycloak
+    version: "21.x"
+    repository: https://charts.bitnami.com/bitnami

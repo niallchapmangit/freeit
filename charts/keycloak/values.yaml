@@ -1,0 +1,39 @@
+# Required by provisioning engine — set per company at deploy time.
+companyId: ""
+domain: ""
+
+ingress:
+  tlsSecret: wildcard-tls
+
+keycloak:
+  auth:
+    # adminPassword must be injected at deploy time — never committed.
+    # Set via: --set keycloak.auth.adminPassword=$KEYCLOAK_ADMIN_PASS
+    adminUser: admin
+    adminPassword: ""
+
+  ingress:
+    enabled: true
+    ingressClassName: nginx
+    hostname: "auth.{{ .Values.domain }}"
+    tls: true
+    extraTls:
+      - hosts:
+          - "auth.{{ .Values.domain }}"
+        secretName: "{{ .Values.ingress.tlsSecret }}"
+
+  postgresql:
+    enabled: true
+    auth:
+      # postgresPassword injected at deploy time.
+      postgresPassword: ""
+
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      memory: 1Gi
+
+  # Realm and client config is handled by the provisioning engine post-deploy (E2.2).
+  # Do not pre-bake realm JSON here.

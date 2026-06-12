@@ -1,0 +1,24 @@
+# Required by provisioning engine — set per company at deploy time.
+companyId: ""
+domain: ""
+
+ingress:
+  # Name of the pre-populated wildcard TLS secret in ingress-nginx namespace.
+  # Populated by the deploy-trigger before Flux reconciles.
+  tlsSecret: wildcard-tls
+
+ingress-nginx:
+  controller:
+    service:
+      type: LoadBalancer
+      externalTrafficPolicy: Local
+    config:
+      use-forwarded-headers: "true"
+    extraArgs:
+      default-ssl-certificate: "ingress-nginx/wildcard-tls"
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        memory: 256Mi

@@ -1,0 +1,61 @@
+#cloud-config
+# Rendered by OpenTofu — do not edit manually.
+# Consumed by substrate-* modules via the node contract.
+
+hostname: freeit-${company_id}
+fqdn: freeit-${company_id}.internal
+
+package_update: true
+package_upgrade: true
+
+packages:
+  - curl
+  - unzip
+  - jq
+  - fail2ban
+%{ for pkg in extra_packages ~}
+  - ${pkg}
+%{ endfor ~}
+
+write_files:
+  - path: /etc/sysctl.d/99-k3s.conf
+    content: |
+      net.ipv4.ip_forward=1
+      net.bridge.bridge-nf-call-iptables=1
+      net.bridge.bridge-nf-call-ip6tables=1
+    permissions: "0644"
+
+  - path: /etc/fail2ban/jail.d/sshd.local
+    content: |
+      [sshd]
+      enabled = true
+      maxretry = 5
+      bantime  = 1h
+    permissions: "0644"
+
+runcmd:
+  # Apply kernel params
+  - sysctl --system
+
+  # Harden SSH: disable root login and password auth
+  - sed -i 's/^#*PermitRootLogin.*/PermitRootLogin no/' /etc/ssh/sshd_config
+  - sed -i 's/^#*PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
+  - systemctl reload ssh
+
+  # Enable fail2ban
+  - systemctl enable --now fail2ban
+
+  # Install k3s (single-node, no traefik — we bring our own ingress)
+  - >
+    curl -sfL https://get.k3s.io |
+    INSTALL_K3S_VERSION="${k3s_version}"
+    INSTALL_K3S_EXEC="server --disable traefik --write-kubeconfig-mode 644"
+    sh -
+
+  # Wait for k3s to be ready
+  - until k3s kubectl get nodes | grep -q ' Ready'; do sleep 5; done
+
+  # Signal completion
+  - touch /var/lib/cloud/instance/freeit-bootstrap-complete
+
+final_message: "freeit node bootstrap complete for company ${company_id} after $UPTIME seconds."

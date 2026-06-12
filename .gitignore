@@ -1,0 +1,20 @@
+# OpenTofu / Terraform
+**/.terraform/
+**/.terraform.lock.hcl
+*.tfstate
+*.tfstate.backup
+*.tfstate.lock.info
+*.tfplan
+*.otf.enc
+
+# Secret var files — use example.tfvars as template, never commit real values
+infra/stacks/company/env/*.tfvars
+!infra/stacks/company/env/example.tfvars
+
+# Passphrases and credentials
+*.passphrase
+.env
+.env.*
+
+# macOS
+.DS_Store
