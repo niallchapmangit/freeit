@@ -1,0 +1,3 @@
+# Don't package downloaded dependency charts into source control.
+# Run `helm dependency update` locally before deploying.
+charts/

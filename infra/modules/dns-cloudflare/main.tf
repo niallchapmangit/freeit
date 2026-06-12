@@ -10,8 +10,8 @@ terraform {
 }
 
 # One wildcard record covers all subdomains for this company:
-#   *.acme-demo.yourdemo.com → node IP
-# This means auth.acme-demo.yourdemo.com, files.acme-demo.yourdemo.com, etc.
+#   *.acme-demo.free-it-infra.com → node IP
+# This means auth.acme-demo.free-it-infra.com, files.acme-demo.free-it-infra.com, etc.
 # are all routed to the same node — ingress-nginx routes by hostname from there.
 resource "cloudflare_dns_record" "wildcard" {
   zone_id = var.cloudflare_zone_id
@@ -22,7 +22,7 @@ resource "cloudflare_dns_record" "wildcard" {
   proxied = var.proxied
 }
 
-# Bare company subdomain — resolves acme-demo.yourdemo.com itself (e.g. a landing page).
+# Bare company subdomain — resolves acme-demo.free-it-infra.com itself (e.g. a landing page).
 resource "cloudflare_dns_record" "apex" {
   zone_id = var.cloudflare_zone_id
   name    = "${var.company_id}.${var.root_domain}"

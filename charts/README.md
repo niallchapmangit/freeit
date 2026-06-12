@@ -21,7 +21,7 @@ Every chart MUST accept these top-level values (used by the provisioning engine)
 | Key | Type | Description |
 |---|---|---|
 | `companyId` | string | Company slug — used in resource names and labels |
-| `domain` | string | Full company domain (e.g. `acme-demo.yourdemo.com`) |
+| `domain` | string | Full company domain (e.g. `acme-demo.free-it-infra.com`) |
 | `ingress.tlsSecret` | string | Name of the wildcard TLS secret in the app namespace |
 
 Flux variable substitution (`${company_id}`, `${company_domain}`) is used in

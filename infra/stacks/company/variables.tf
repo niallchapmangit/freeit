@@ -72,7 +72,7 @@ variable "tags" {
 
 variable "root_domain" {
   type        = string
-  default     = "yourdemo.com"
+  default     = "free-it-infra.com"
   description = "Root demo domain. Company subdomain will be {company_id}.{root_domain}."
 }
 

@@ -14,7 +14,7 @@ output "ssh_command" {
 }
 
 output "company_domain" {
-  description = "The company's base domain (e.g. acme-demo.yourdemo.com)."
+  description = "The company's base domain (e.g. acme-demo.free-it-infra.com)."
   value       = module.dns.company_domain
 }
 

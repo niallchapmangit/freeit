@@ -1,0 +1,78 @@
+# Required — set per company at deploy time.
+companyId: ""
+domain: ""
+
+ingress:
+  tlsSecret: wildcard-tls
+
+nextcloud:
+  host: "files.{{ .Values.domain }}"
+
+  # Admin credentials injected from nextcloud-secrets at deploy time.
+  existingSecret:
+    enabled: true
+    secretName: nextcloud-secrets
+    usernameKey: admin-username
+    passwordKey: admin-password
+    tokenKey: nextcloud-token
+    smtpUsernameKey: smtp-username
+    smtpPasswordKey: smtp-password
+
+  # OIDC via Keycloak (user_oidc app). Config injected post-deploy by
+  # bootstrap-nextcloud.sh — Nextcloud's OIDC config requires the app to be
+  # running, so it can't be fully baked into Helm values.
+  configs:
+    oidc.config.php: |-
+      <?php
+      // Placeholder — overwritten by bootstrap-nextcloud.sh after first deploy.
+      $CONFIG = [];
+
+  defaultConfigs:
+    # Disable Nextcloud's own login form — SSO only in production.
+    # Set to true during initial bootstrap so admin can log in before OIDC is wired.
+    .noDefaultLoginForm: false
+
+  mail:
+    enabled: false   # E1.9 wires this in
+
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      memory: 1Gi
+
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: local-path   # k3s built-in — no external provisioner needed
+
+  ingress:
+    enabled: true
+    className: nginx
+    annotations:
+      nginx.ingress.kubernetes.io/proxy-body-size: "10g"
+      nginx.ingress.kubernetes.io/proxy-buffering: "off"
+      nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    tls:
+      - secretName: "{{ .Values.ingress.tlsSecret }}"
+        hosts:
+          - "files.{{ .Values.domain }}"
+
+  # PostgreSQL subchart
+  postgresql:
+    enabled: true
+    global:
+      postgresql:
+        auth:
+          existingSecret: nextcloud-secrets
+          secretKeys:
+            adminPasswordKey: postgres-password
+            userPasswordKey: postgres-user-password
+            replicationPasswordKey: postgres-replication-password
+
+  redis:
+    enabled: true
+    auth:
+      existingSecret: nextcloud-secrets
+      existingSecretPasswordKey: redis-password

@@ -75,7 +75,7 @@ resource "acme_registration" "freeit" {
 resource "acme_certificate" "wildcard" {
   account_key_pem = acme_registration.freeit.account_key_pem
 
-  # *.yourdemo.com covers acme-demo.yourdemo.com, auth.acme-demo.yourdemo.com, etc.
+  # *.free-it-infra.com covers acme-demo.free-it-infra.com, auth.acme-demo.free-it-infra.com, etc.
   # The SAN covers the root domain itself too.
   common_name               = "*.${var.root_domain}"
   subject_alternative_names = ["${var.root_domain}"]

@@ -15,6 +15,10 @@ infra/stacks/company/env/*.tfvars
 *.passphrase
 .env
 .env.*
+!.env.example
+
+# Helm downloaded chart dependencies — regenerate with `helm dependency update`
+charts/*/charts/
 
 # macOS
 .DS_Store

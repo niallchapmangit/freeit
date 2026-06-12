@@ -31,7 +31,7 @@ class FilesSeeder:
 
     def __init__(self, base_url: str, app_password_fn: "AppPasswordFn") -> None:
         """
-        base_url:        e.g. https://files.acme-demo.yourdemo.com
+        base_url:        e.g. https://files.acme-demo.free-it-infra.com
         app_password_fn: callable(email) → Nextcloud app password for that user
         """
         self._base = base_url.rstrip("/")

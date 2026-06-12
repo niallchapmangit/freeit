@@ -1,6 +1,6 @@
 variable "root_domain" {
   type        = string
-  default     = "yourdemo.com"
+  default     = "free-it-infra.com"
   description = "Root demo domain. Wildcard cert covers *.root_domain."
 }
 

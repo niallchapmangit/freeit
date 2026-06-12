@@ -9,5 +9,5 @@ metadata:
   namespace: flux-system
 data:
   company_id: "COMPANY_ID"
-  company_domain: "COMPANY_DOMAIN"   # e.g. acme-demo.yourdemo.com
+  company_domain: "COMPANY_DOMAIN"   # e.g. acme-demo.free-it-infra.com
   cluster_issuer: "wildcard-tls"

@@ -80,7 +80,7 @@ tofu fmt -recursive infra/ && tofu validate
 | E2.2 | Identity provisioning from CSV | TODO |
 | **E2.3** | **Seed data generator** | **DONE** |
 | E2.4 | Golden-path onboarding template | TODO |
-| E3.1 | Nextcloud golden path | TODO |
+| **E3.1** | **Nextcloud golden path** | **DONE** |
 | E3.2 | Mail & calendar surface | TODO |
 | E3.3 | Additional apps | TODO |
 | E4.1 | Recruiter onboarding flow | TODO |

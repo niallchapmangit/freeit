@@ -2,8 +2,8 @@
 # Copy to env/prod.tfvars and fill in real values.
 # NEVER commit API tokens or passphrases.
 
-root_domain       = "yourdemo.com"
-acme_email        = "ops@yourdemo.com"
+root_domain       = "free-it-infra.com"
+acme_email        = "ops@free-it-infra.com"
 state_bucket_name = "freeit-tofu-state-prod"
 aws_region        = "eu-west-1"
 

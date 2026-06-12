@@ -4,3 +4,4 @@ kind: Kustomization
 # Each entry is a HelmRelease that uses ${company_id} and ${company_domain} from company-vars.
 resources:
   - keycloak.yaml
+  - nextcloud.yaml

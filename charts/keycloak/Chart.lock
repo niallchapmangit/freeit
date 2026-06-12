@@ -1,0 +1,8 @@
+dependencies:
+- name: keycloak
+  repository: https://charts.bitnami.com/bitnami
+  version: 21.4.4
+digest: sha256:placeholder-run-helm-dependency-update-to-regenerate
+generated: "2026-06-12T00:00:00.000000000Z"
+# NOTE: Run `helm dependency update charts/keycloak` before first deploy to
+# regenerate this file with the real digest and download charts/keycloak/charts/.

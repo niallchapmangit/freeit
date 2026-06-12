@@ -86,7 +86,7 @@ locals {
 
 # ── DNS (Cloudflare) ──────────────────────────────────────────────────────────
 # Decoupled from the compute substrate — Cloudflare is always the DNS provider.
-# Creates *.{company_id}.yourdemo.com and {company_id}.yourdemo.com → node EIP.
+# Creates *.{company_id}.free-it-infra.com and {company_id}.free-it-infra.com → node EIP.
 
 module "dns" {
   source = "../../modules/dns-cloudflare"

@@ -1,0 +1,3 @@
+record_type,company_id,company_name,root_domain,node_size,recruiter_email,email,first_name,last_name,role,department,job_title,apps,is_onboarding_target
+company,niall-demo,Niall Demo Co,free-it-infra.com,medium,niallchapman123@gmail.com,,,,,,,,
+employee,niall-demo,,,,,niall@niall-demo.free-it-infra.com,Niall,Chapman,admin,IT,IT Administrator,nextcloud,true

@@ -5,7 +5,7 @@ variable "company_id" {
 
 variable "root_domain" {
   type        = string
-  description = "Root demo domain (e.g. yourdemo.com). Wildcard cert covers *.root_domain."
+  description = "Root demo domain (e.g. free-it-infra.com). Wildcard cert covers *.root_domain."
 }
 
 variable "node_ip" {

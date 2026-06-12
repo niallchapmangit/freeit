@@ -11,9 +11,9 @@ CSV row (employee)
     ▼
 Keycloak realm: <company_id>
     │   (OIDC / Authorization Code + PKCE)
-    ├── Nextcloud        → https://files.<company>.yourdemo.com
-    ├── Mail (Roundcube) → https://mail.<company>.yourdemo.com
-    └── Portal           → https://<company>.yourdemo.com
+    ├── Nextcloud        → https://files.<company>.free-it-infra.com
+    ├── Mail (Roundcube) → https://mail.<company>.free-it-infra.com
+    └── Portal           → https://<company>.free-it-infra.com
 ```
 
 One realm per company. One OIDC client per app. Client secrets stored in
@@ -22,7 +22,7 @@ AWS Secrets Manager at `freeit/<company_id>/oidc-secret-<app>`.
 ## OIDC discovery endpoint
 
 ```
-https://auth.<company_id>.yourdemo.com/realms/<company_id>/.well-known/openid-configuration
+https://auth.<company_id>.free-it-infra.com/realms/<company_id>/.well-known/openid-configuration
 ```
 
 All apps use this URL — they need no other Keycloak configuration.
@@ -79,7 +79,7 @@ The provisioning engine creates users via the **Keycloak Admin REST API**:
 Authentication: client credentials grant from the `admin-cli` client in the master realm
 using the `admin` user credentials (stored at `freeit/<company_id>/keycloak-admin-password`).
 
-Token endpoint: `https://auth.<company>.yourdemo.com/realms/master/protocol/openid-connect/token`
+Token endpoint: `https://auth.<company>.free-it-infra.com/realms/master/protocol/openid-connect/token`
 
 ## Idempotency
 

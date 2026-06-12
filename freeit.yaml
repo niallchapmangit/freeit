@@ -1,0 +1,57 @@
+# freeit.yaml — operator configuration
+#
+# This file holds the shared infrastructure settings for your deployment.
+# It is the only file you need to edit before running `freeit provision`.
+#
+# SETUP STEPS:
+#   1. Register a domain in Cloudflare (nameservers must point to Cloudflare).
+#   2. Create a Cloudflare API token with Zone:DNS:Edit permission for your domain.
+#   3. Create an S3 bucket in an EU region for OpenTofu state:
+#        aws s3api create-bucket --bucket <your-bucket> --region eu-west-1 \
+#          --create-bucket-configuration LocationConstraint=eu-west-1
+#   4. Run the platform stack once to issue the wildcard TLS cert:
+#        tofu -chdir=infra/stacks/platform apply
+#   5. Fill in the values below and commit this file (secrets go in .env, not here).
+#   6. Run: freeit provision docs/csv/your-company.csv
+
+# ── Domain ────────────────────────────────────────────────────────────────────
+# The root domain you registered. Every company gets a <company_id>.<root_domain> subdomain.
+root_domain: "free-it-infra.com"
+
+# Your Cloudflare zone ID — found on the right sidebar of your domain in the Cloudflare dashboard.
+cloudflare_zone_id: ""
+
+# ── Cloud / State ─────────────────────────────────────────────────────────────
+# AWS region for the state bucket and default node provisioning. Must be EU.
+aws_region: "eu-west-1"
+
+# S3 bucket that holds OpenTofu state (created once, shared across all companies).
+state_bucket: "freeit-tofu-state-prod"
+
+# ── SSH ───────────────────────────────────────────────────────────────────────
+# Path to the ED25519 key pair used to access provisioned nodes.
+ssh_key: "~/.ssh/freeit_ed25519"
+ssh_public_key: "~/.ssh/freeit_ed25519.pub"
+
+# CIDR(s) allowed to SSH into nodes (port 22). Comma-separated.
+# Use your office/VPN egress IP. Never 0.0.0.0/0.
+ssh_cidrs: ""
+
+# CIDR(s) allowed to reach the k3s API (port 6443). Same restriction applies.
+api_cidrs: ""
+
+# Default SSH user for the cloud image. Ubuntu images use "ubuntu".
+ssh_user: "ubuntu"
+
+# ── Git / Flux ────────────────────────────────────────────────────────────────
+# Git remote URL for this repo (used by Flux to pull GitOps manifests).
+# Use SSH format so the deploy key is used: git@github.com:org/freeit.git
+repo_url: ""
+
+# Path to the SSH deploy key registered in GitHub as a read-only deploy key.
+deploy_key: "~/.ssh/freeit_deploy_ed25519"
+
+# ── Email ─────────────────────────────────────────────────────────────────────
+# Verified SES sender address. Must be verified in AWS SES (eu-west-1).
+# Recruiter invite emails are sent from this address.
+ses_from_address: ""

@@ -11,7 +11,7 @@
 #     --ssh-user     ubuntu \
 #     --ssh-key      ~/.ssh/freeit_ed25519 \
 #     --repo-url     git@github.com:org/freeit.git \
-#     --domain       acme-demo.yourdemo.com \
+#     --domain       acme-demo.free-it-infra.com \
 #     --deploy-key   /path/to/deploy-key \
 #     --state-bucket freeit-tofu-state-prod \
 #     --aws-region   eu-west-1
@@ -43,6 +43,7 @@ DEPLOY_KEY=""
 STATE_BUCKET=""
 AWS_REGION="eu-west-1"
 SECRETS_PREFIX="freeit"
+export AWS_REGION   # propagated to bootstrap-realm.sh and any child processes
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -63,6 +64,7 @@ done
    -z "$DOMAIN" || -z "$DEPLOY_KEY" || -z "$STATE_BUCKET" ]] \
   && { echo "Missing required arguments."; usage; }
 
+export AWS_REGION   # re-export after arg parsing in case --aws-region was passed
 SSH_OPTS="-i $SSH_KEY -o StrictHostKeyChecking=no -o ConnectTimeout=10"
 SSH="ssh $SSH_OPTS $SSH_USER@$NODE_IP"
 SCP="scp $SSH_OPTS"
@@ -109,6 +111,11 @@ log "Retrieving/generating app secrets..."
 KC_ADMIN_PASS=$(secret_get_or_create "keycloak-admin-password")
 KC_PG_PASS=$(secret_get_or_create "keycloak-postgres-password")
 KC_PG_USER_PASS=$(secret_get_or_create "keycloak-postgres-user-password")
+NC_ADMIN_PASS=$(secret_get_or_create "nextcloud-admin-password")
+NC_PG_PASS=$(secret_get_or_create "nextcloud-postgres-password")
+NC_PG_USER_PASS=$(secret_get_or_create "nextcloud-postgres-user-password")
+NC_PG_REPL_PASS=$(secret_get_or_create "nextcloud-postgres-replication-password")
+NC_REDIS_PASS=$(secret_get_or_create "nextcloud-redis-password")
 
 # ── 3. Wait for cloud-init to finish ─────────────────────────────────────────
 
@@ -141,7 +148,7 @@ $SSH "
 # All secrets must exist before HelmReleases that reference them are applied.
 
 log "Creating namespaces..."
-for ns in ingress-nginx flux-system keycloak; do
+for ns in ingress-nginx flux-system keycloak nextcloud; do
   $SSH "k3s kubectl create namespace $ns --dry-run=client -o yaml | k3s kubectl apply -f -"
 done
 
@@ -167,6 +174,20 @@ $SSH "k3s kubectl create secret generic keycloak-secrets \
   --from-literal=admin-password='${KC_ADMIN_PASS}' \
   --from-literal=postgres-password='${KC_PG_PASS}' \
   --from-literal=postgres-user-password='${KC_PG_USER_PASS}' \
+  --dry-run=client -o yaml | k3s kubectl apply -f -"
+
+log "Uploading Nextcloud secrets..."
+$SSH "k3s kubectl create secret generic nextcloud-secrets \
+  -n nextcloud \
+  --from-literal=admin-username='admin' \
+  --from-literal=admin-password='${NC_ADMIN_PASS}' \
+  --from-literal=nextcloud-token='$(openssl rand -hex 32)' \
+  --from-literal=postgres-password='${NC_PG_PASS}' \
+  --from-literal=postgres-user-password='${NC_PG_USER_PASS}' \
+  --from-literal=postgres-replication-password='${NC_PG_REPL_PASS}' \
+  --from-literal=redis-password='${NC_REDIS_PASS}' \
+  --from-literal=smtp-username='' \
+  --from-literal=smtp-password='' \
   --dry-run=client -o yaml | k3s kubectl apply -f -"
 
 # ── 7. Upload Flux deploy key (GitHub → cluster read access) ──────────────────
@@ -225,9 +246,28 @@ SCRIPT_DIR_ABS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   --keycloak-url "https://auth.${DOMAIN}" \
   --admin-pass   "$KC_ADMIN_PASS"
 
+# ── 12. Bootstrap Nextcloud ───────────────────────────────────────────────────
+
+log "Waiting for Nextcloud to be ready..."
+$SSH "k3s kubectl rollout status deployment/nextcloud -n nextcloud --timeout=10m"
+
+# Fetch the Nextcloud OIDC client secret that bootstrap-realm.sh stored.
+NC_OIDC_SECRET=$(aws secretsmanager get-secret-value \
+  --secret-id "freeit/${COMPANY_ID}/oidc-secret-nextcloud" \
+  --region "$AWS_REGION" --query SecretString --output text)
+
+"${SCRIPT_DIR_ABS}/bootstrap-nextcloud.sh" \
+  --company-id    "$COMPANY_ID" \
+  --domain        "$DOMAIN" \
+  --nextcloud-url "https://files.${DOMAIN}" \
+  --admin-pass    "$NC_ADMIN_PASS" \
+  --keycloak-url  "https://auth.${DOMAIN}" \
+  --oidc-secret   "$NC_OIDC_SECRET"
+
 log "────────────────────────────────────────────"
 log "Cluster bootstrap complete."
 log "  Company  : $COMPANY_ID"
 log "  Node     : $SSH_USER@$NODE_IP"
 log "  Auth     : https://auth.${DOMAIN}"
+log "  Files    : https://files.${DOMAIN}"
 log "────────────────────────────────────────────"

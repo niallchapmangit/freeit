@@ -8,8 +8,8 @@
 # Usage:
 #   bootstrap-realm.sh \
 #     --company-id   acme-demo \
-#     --domain       acme-demo.yourdemo.com \
-#     --keycloak-url https://auth.acme-demo.yourdemo.com \
+#     --domain       acme-demo.free-it-infra.com \
+#     --keycloak-url https://auth.acme-demo.free-it-infra.com \
 #     --admin-pass   <keycloak admin password>
 #
 # Creates:

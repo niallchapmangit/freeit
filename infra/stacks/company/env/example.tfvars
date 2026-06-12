@@ -22,7 +22,7 @@ tags = {
   Owner       = "platform-team"
 }
 
-root_domain = "yourdemo.com"  # replace with your real domain
+root_domain = "free-it-infra.com"  # replace with your real domain
 
 # Secrets — set via environment variables, never in this file:
 # export TF_VAR_state_passphrase="..."
