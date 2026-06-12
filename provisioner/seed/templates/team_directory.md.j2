@@ -1,0 +1,14 @@
+# {{ company.company_name }} — Team Directory
+
+*Generated {{ today.isoformat() }}*
+
+| Name | Email | Role | Department | Title |
+|------|-------|------|------------|-------|
+{% for emp in employees | sort(attribute="last_name") %}
+| {{ emp.first_name }} {{ emp.last_name }} | {{ emp.email }} | {{ emp.role.value | title }} | {{ emp.department or "—" }} | {{ emp.job_title or "—" }} |
+{% endfor %}
+
+---
+
+**Total headcount:** {{ employees | length }}
+**Departments:** {{ employees | map(attribute="department") | select | unique | list | join(", ") or "—" }}

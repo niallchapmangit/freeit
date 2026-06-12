@@ -1,0 +1,50 @@
+# {{ company.company_name }} — Company Handbook
+
+*Last updated: {{ today.isoformat() if today is defined else "—" }}*
+
+---
+
+## Who we are
+
+{{ company.company_name }} is a growing company with {{ employees | length }} team member{{ "s" if employees | length != 1 else "" }}
+across {{ employees | map(attribute="department") | select | unique | list | length }} department{{ "s" if employees | map(attribute="department") | select | unique | list | length != 1 else "" }}.
+
+---
+
+## How we work
+
+- **Communication:** We default to async. Use email for non-urgent items.
+- **Meetings:** Keep them short. Every meeting has an agenda.
+- **Files:** Everything lives in Nextcloud under `/shared/`. No email attachments.
+- **Decisions:** Document them. If it isn't written down, it didn't happen.
+
+---
+
+## Tools
+
+| Tool | URL | Purpose |
+|------|-----|---------|
+| Files | https://files.{{ company.company_id }}.{{ company.root_domain }} | Documents, storage |
+| Mail | https://mail.{{ company.company_id }}.{{ company.root_domain }} | Email & calendar |
+| Account | https://auth.{{ company.company_id }}.{{ company.root_domain }} | SSO, password reset |
+
+---
+
+## People & departments
+
+{% for dept in employees | map(attribute="department") | select | unique | sort %}
+### {{ dept }}
+
+{% for emp in employees if emp.department == dept %}
+- **{{ emp.first_name }} {{ emp.last_name }}** — {{ emp.job_title or emp.role.value | title }}
+{% endfor %}
+
+{% endfor %}
+---
+
+## IT & access
+
+Your account is managed centrally. To reset your password or request app access,
+visit https://auth.{{ company.company_id }}.{{ company.root_domain }}.
+
+For urgent issues contact your IT admin.

@@ -68,17 +68,17 @@ tofu fmt -recursive infra/ && tofu validate
 | E0.2 | Department & app catalog | TODO |
 | **E1.1** | **IaC & provider-agnostic provisioning** | **DONE** |
 | **E1.2** | **k3s cluster & GitOps** | **DONE** |
-| E1.3 | Identity & SSO | TODO |
-| E1.4 | Networking: wildcard DNS/TLS/ingress | TODO |
+| **E1.3** | **Identity & SSO (Keycloak)** | **DONE** |
+| **E1.4** | **Networking: wildcard DNS/TLS/ingress** | **DONE** |
 | E1.5 | Data layer | TODO |
 | E1.6 | Secrets management | TODO |
 | E1.7 | Backup & disaster recovery | TODO |
 | E1.8 | Observability | TODO |
 | E1.9 | Email / SMTP / deliverability | TODO |
 | E1.10 | Security hardening & GDPR | TODO |
-| E2.1 | CSV schema & provisioning engine | TODO |
+| **E2.1** | **CSV schema & provisioning engine** | **DONE** |
 | E2.2 | Identity provisioning from CSV | TODO |
-| E2.3 | Seed data generator | TODO |
+| **E2.3** | **Seed data generator** | **DONE** |
 | E2.4 | Golden-path onboarding template | TODO |
 | E3.1 | Nextcloud golden path | TODO |
 | E3.2 | Mail & calendar surface | TODO |

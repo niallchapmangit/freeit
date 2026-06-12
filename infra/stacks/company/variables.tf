@@ -69,3 +69,21 @@ variable "tags" {
   default     = {}
   description = "Additional tags applied to all resources."
 }
+
+variable "root_domain" {
+  type        = string
+  default     = "yourdemo.com"
+  description = "Root demo domain. Company subdomain will be {company_id}.{root_domain}."
+}
+
+variable "cloudflare_api_token" {
+  type        = string
+  sensitive   = true
+  description = "Cloudflare API token with Zone:DNS:Edit. Set via TF_VAR_cloudflare_api_token."
+}
+
+variable "cloudflare_zone_id" {
+  type        = string
+  sensitive   = true
+  description = "Cloudflare zone ID for root_domain. Set via TF_VAR_cloudflare_zone_id."
+}

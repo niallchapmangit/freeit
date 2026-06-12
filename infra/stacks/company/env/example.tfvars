@@ -22,5 +22,9 @@ tags = {
   Owner       = "platform-team"
 }
 
-# state_passphrase is NOT in this file — set via environment variable:
-# export TF_VAR_state_passphrase="your-secret-passphrase"
+root_domain = "yourdemo.com"  # replace with your real domain
+
+# Secrets — set via environment variables, never in this file:
+# export TF_VAR_state_passphrase="..."
+# export TF_VAR_cloudflare_api_token="..."
+# export TF_VAR_cloudflare_zone_id="..."

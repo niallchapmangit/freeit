@@ -6,15 +6,19 @@
 #
 # Usage:
 #   bootstrap-cluster.sh \
-#     --company-id    acme-demo \
-#     --node-ip       1.2.3.4 \
-#     --ssh-user      ubuntu \
-#     --ssh-key       ~/.ssh/freeit_ed25519 \
-#     --repo-url      git@github.com:org/freeit.git \
-#     --domain        acme-demo.yourdemo.com \
-#     --deploy-key    /path/to/deploy-key          \  # private key for Flux → GitHub
-#     --wildcard-cert /path/to/wildcard.crt \
-#     --wildcard-key  /path/to/wildcard.key
+#     --company-id   acme-demo \
+#     --node-ip      1.2.3.4 \
+#     --ssh-user     ubuntu \
+#     --ssh-key      ~/.ssh/freeit_ed25519 \
+#     --repo-url     git@github.com:org/freeit.git \
+#     --domain       acme-demo.yourdemo.com \
+#     --deploy-key   /path/to/deploy-key \
+#     --state-bucket freeit-tofu-state-prod \
+#     --aws-region   eu-west-1
+#
+# The wildcard TLS cert is fetched from S3 (stored there by infra/stacks/platform).
+# App secrets are generated once and stored in AWS Secrets Manager — idempotent.
+# AWS credentials must be available in the environment (AWS_PROFILE or env vars).
 #
 # Idempotent: re-running converges without duplicating resources.
 
@@ -36,26 +40,27 @@ SSH_KEY=""
 REPO_URL=""
 DOMAIN=""
 DEPLOY_KEY=""
-WILDCARD_CERT=""
-WILDCARD_KEY=""
+STATE_BUCKET=""
+AWS_REGION="eu-west-1"
+SECRETS_PREFIX="freeit"
 
 while [[ $# -gt 0 ]]; do
   case $1 in
-    --company-id)    COMPANY_ID="$2";    shift 2 ;;
-    --node-ip)       NODE_IP="$2";       shift 2 ;;
-    --ssh-user)      SSH_USER="$2";      shift 2 ;;
-    --ssh-key)       SSH_KEY="$2";       shift 2 ;;
-    --repo-url)      REPO_URL="$2";      shift 2 ;;
-    --domain)        DOMAIN="$2";        shift 2 ;;
-    --deploy-key)    DEPLOY_KEY="$2";    shift 2 ;;
-    --wildcard-cert) WILDCARD_CERT="$2"; shift 2 ;;
-    --wildcard-key)  WILDCARD_KEY="$2";  shift 2 ;;
+    --company-id)   COMPANY_ID="$2";   shift 2 ;;
+    --node-ip)      NODE_IP="$2";      shift 2 ;;
+    --ssh-user)     SSH_USER="$2";     shift 2 ;;
+    --ssh-key)      SSH_KEY="$2";      shift 2 ;;
+    --repo-url)     REPO_URL="$2";     shift 2 ;;
+    --domain)       DOMAIN="$2";       shift 2 ;;
+    --deploy-key)   DEPLOY_KEY="$2";   shift 2 ;;
+    --state-bucket) STATE_BUCKET="$2"; shift 2 ;;
+    --aws-region)   AWS_REGION="$2";   shift 2 ;;
     *) echo "Unknown flag: $1"; usage ;;
   esac
 done
 
 [[ -z "$COMPANY_ID" || -z "$NODE_IP" || -z "$SSH_KEY" || -z "$REPO_URL" || \
-   -z "$DOMAIN" || -z "$DEPLOY_KEY" || -z "$WILDCARD_CERT" || -z "$WILDCARD_KEY" ]] \
+   -z "$DOMAIN" || -z "$DEPLOY_KEY" || -z "$STATE_BUCKET" ]] \
   && { echo "Missing required arguments."; usage; }
 
 SSH_OPTS="-i $SSH_KEY -o StrictHostKeyChecking=no -o ConnectTimeout=10"
@@ -64,7 +69,48 @@ SCP="scp $SSH_OPTS"
 
 log() { echo "[freeit] $*"; }
 
-# ── 1. Wait for cloud-init to finish ─────────────────────────────────────────
+# ── 1. Fetch wildcard TLS cert from S3 ───────────────────────────────────────
+# Issued once by infra/stacks/platform (Let's Encrypt DNS-01 via Cloudflare).
+
+log "Fetching wildcard TLS cert from S3..."
+TMPDIR=$(mktemp -d)
+trap 'rm -rf "$TMPDIR"' EXIT
+
+WILDCARD_CERT="$TMPDIR/tls.crt"
+WILDCARD_KEY_FILE="$TMPDIR/tls.key"
+
+aws s3 cp "s3://${STATE_BUCKET}/platform/wildcard-tls/tls.crt" "$WILDCARD_CERT" \
+  --region "$AWS_REGION" --quiet
+aws s3 cp "s3://${STATE_BUCKET}/platform/wildcard-tls/tls.key" "$WILDCARD_KEY_FILE" \
+  --region "$AWS_REGION" --quiet
+log "Wildcard cert fetched."
+
+# ── 2. Generate or retrieve app secrets ──────────────────────────────────────
+# Passwords are generated once and stored in AWS Secrets Manager.
+# Re-running retrieves existing values — never re-generates.
+
+secret_get_or_create() {
+  local name="$1"
+  local secret_id="${SECRETS_PREFIX}/${COMPANY_ID}/${name}"
+  if aws secretsmanager describe-secret --secret-id "$secret_id" \
+       --region "$AWS_REGION" &>/dev/null; then
+    aws secretsmanager get-secret-value --secret-id "$secret_id" \
+      --region "$AWS_REGION" --query SecretString --output text
+  else
+    local value
+    value=$(openssl rand -base64 32 | tr -d '=+/' | cut -c1-32)
+    aws secretsmanager create-secret --name "$secret_id" \
+      --secret-string "$value" --region "$AWS_REGION" --output none
+    echo "$value"
+  fi
+}
+
+log "Retrieving/generating app secrets..."
+KC_ADMIN_PASS=$(secret_get_or_create "keycloak-admin-password")
+KC_PG_PASS=$(secret_get_or_create "keycloak-postgres-password")
+KC_PG_USER_PASS=$(secret_get_or_create "keycloak-postgres-user-password")
+
+# ── 3. Wait for cloud-init to finish ─────────────────────────────────────────
 
 log "Waiting for node bootstrap to complete on $NODE_IP..."
 until $SSH test -f /var/lib/cloud/instance/freeit-bootstrap-complete 2>/dev/null; do
@@ -72,7 +118,7 @@ until $SSH test -f /var/lib/cloud/instance/freeit-bootstrap-complete 2>/dev/null
 done
 log "Node bootstrap complete."
 
-# ── 2. Wait for k3s to be ready ──────────────────────────────────────────────
+# ── 4. Wait for k3s to be ready ──────────────────────────────────────────────
 
 log "Waiting for k3s..."
 until $SSH "k3s kubectl get nodes 2>/dev/null | grep -q ' Ready'"; do
@@ -80,7 +126,7 @@ until $SSH "k3s kubectl get nodes 2>/dev/null | grep -q ' Ready'"; do
 done
 log "k3s is ready."
 
-# ── 3. Install Flux CLI on the node ──────────────────────────────────────────
+# ── 5. Install Flux CLI on the node ──────────────────────────────────────────
 
 log "Installing Flux $FLUX_VERSION on node..."
 $SSH "
@@ -91,17 +137,19 @@ $SSH "
   fi
 "
 
-# ── 4. Pre-populate the wildcard TLS secret ───────────────────────────────────
-# This is what makes new subdomains instantly reachable — no per-company cert issuance.
+# ── 6. Pre-populate namespaces and secrets before Flux reconciles ─────────────
+# All secrets must exist before HelmReleases that reference them are applied.
+
+log "Creating namespaces..."
+for ns in ingress-nginx flux-system keycloak; do
+  $SSH "k3s kubectl create namespace $ns --dry-run=client -o yaml | k3s kubectl apply -f -"
+done
 
 log "Uploading wildcard TLS secret..."
-$SSH "k3s kubectl create namespace ingress-nginx --dry-run=client -o yaml | k3s kubectl apply -f -"
-$SSH "k3s kubectl create namespace flux-system  --dry-run=client -o yaml | k3s kubectl apply -f -"
+CERT_B64=$(base64 < "$WILDCARD_CERT"      | tr -d '\n')
+KEY_B64=$(base64  < "$WILDCARD_KEY_FILE"  | tr -d '\n')
 
-CERT_B64=$(base64 < "$WILDCARD_CERT" | tr -d '\n')
-KEY_B64=$(base64  < "$WILDCARD_KEY"  | tr -d '\n')
-
-$SSH "k3s kubectl apply -f - <<'EOF'
+$SSH "k3s kubectl apply -f - <<EOF
 apiVersion: v1
 kind: Secret
 metadata:
@@ -113,17 +161,26 @@ data:
   tls.key: ${KEY_B64}
 EOF"
 
-# ── 5. Upload Flux deploy key (GitHub → cluster read access) ──────────────────
-
-log "Uploading Flux deploy key secret..."
-$SSH "k3s kubectl create secret generic freeit-deploy-key \
-  --from-file=identity=${DEPLOY_KEY} \
-  --from-file=identity.pub=${DEPLOY_KEY}.pub \
-  --from-literal=known_hosts=\"\$(ssh-keyscan github.com 2>/dev/null)\" \
-  -n flux-system \
+log "Uploading Keycloak secrets..."
+$SSH "k3s kubectl create secret generic keycloak-secrets \
+  -n keycloak \
+  --from-literal=admin-password='${KC_ADMIN_PASS}' \
+  --from-literal=postgres-password='${KC_PG_PASS}' \
+  --from-literal=postgres-user-password='${KC_PG_USER_PASS}' \
   --dry-run=client -o yaml | k3s kubectl apply -f -"
 
-# ── 6. Bootstrap Flux ─────────────────────────────────────────────────────────
+# ── 7. Upload Flux deploy key (GitHub → cluster read access) ──────────────────
+
+log "Uploading Flux deploy key secret..."
+KNOWN_HOSTS=$(ssh-keyscan github.com 2>/dev/null)
+$SSH "k3s kubectl create secret generic freeit-deploy-key \
+  -n flux-system \
+  --from-literal=identity=\"$(cat "$DEPLOY_KEY")\" \
+  --from-literal=identity.pub=\"$(cat "${DEPLOY_KEY}.pub")\" \
+  --from-literal=known_hosts=\"${KNOWN_HOSTS}\" \
+  --dry-run=client -o yaml | k3s kubectl apply -f -"
+
+# ── 8. Bootstrap Flux ─────────────────────────────────────────────────────────
 
 log "Bootstrapping Flux..."
 $SSH "flux install --version=${FLUX_VERSION} \
@@ -131,35 +188,46 @@ $SSH "flux install --version=${FLUX_VERSION} \
   --components-extra=image-reflector-controller,image-automation-controller \
   2>&1 | tail -5"
 
-# ── 7. Generate and apply per-company cluster manifests ───────────────────────
-# Renders the company-template, substituting COMPANY_ID / REPO_URL / COMPANY_DOMAIN.
+# ── 9. Generate and apply per-company cluster manifests ───────────────────────
 
 log "Generating cluster manifests for $COMPANY_ID..."
 
-MANIFEST_DIR=$(mktemp -d)
-trap 'rm -rf "$MANIFEST_DIR"' EXIT
-
+MANIFEST_DIR="$TMPDIR/manifests"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TEMPLATE_DIR="$SCRIPT_DIR/../gitops/clusters/company-template"
 
-cp -r "$TEMPLATE_DIR"/* "$MANIFEST_DIR/"
+cp -r "$TEMPLATE_DIR" "$MANIFEST_DIR"
 
-# Substitute placeholders
 find "$MANIFEST_DIR" -type f | xargs sed -i.bak \
   -e "s|COMPANY_ID|$COMPANY_ID|g" \
   -e "s|REPO_URL|$REPO_URL|g" \
   -e "s|COMPANY_DOMAIN|$DOMAIN|g"
 find "$MANIFEST_DIR" -name '*.bak' -delete
 
-# Copy rendered manifests to node and apply
 $SCP -r "$MANIFEST_DIR" "$SSH_USER@$NODE_IP:/tmp/freeit-cluster-manifests"
 $SSH "k3s kubectl apply -k /tmp/freeit-cluster-manifests && rm -rf /tmp/freeit-cluster-manifests"
 
-# ── 8. Wait for Flux reconciliation ───────────────────────────────────────────
+# ── 10. Wait for Flux reconciliation ──────────────────────────────────────────
 
-log "Waiting for Flux to reconcile infra layer (may take 3-5 min)..."
+log "Waiting for Flux to reconcile (may take 3-5 min)..."
 $SSH "flux reconcile kustomization freeit-${COMPANY_ID} --with-source --timeout=10m"
 
-log "Cluster bootstrap complete for company: $COMPANY_ID"
-log "Node: $SSH_USER@$NODE_IP"
-log "Domain: $DOMAIN"
+# ── 11. Bootstrap Keycloak realm ──────────────────────────────────────────────
+# Waits for Keycloak to be ready then runs bootstrap-realm.sh.
+
+log "Waiting for Keycloak to be ready..."
+$SSH "k3s kubectl rollout status deployment/keycloak -n keycloak --timeout=5m"
+
+SCRIPT_DIR_ABS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+"${SCRIPT_DIR_ABS}/bootstrap-realm.sh" \
+  --company-id   "$COMPANY_ID" \
+  --domain       "$DOMAIN" \
+  --keycloak-url "https://auth.${DOMAIN}" \
+  --admin-pass   "$KC_ADMIN_PASS"
+
+log "────────────────────────────────────────────"
+log "Cluster bootstrap complete."
+log "  Company  : $COMPANY_ID"
+log "  Node     : $SSH_USER@$NODE_IP"
+log "  Auth     : https://auth.${DOMAIN}"
+log "────────────────────────────────────────────"

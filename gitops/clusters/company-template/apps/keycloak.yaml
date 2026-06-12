@@ -1,0 +1,30 @@
+---
+# keycloak-secrets is pre-created by bootstrap-cluster.sh before Flux reconciles.
+# Flux will error on this HelmRelease until the secret exists — that's intentional.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: keycloak
+  namespace: keycloak
+spec:
+  interval: 10m
+  dependsOn:
+    - name: ingress-nginx
+      namespace: ingress-nginx
+  chart:
+    spec:
+      chart: ./charts/keycloak
+      sourceRef:
+        kind: GitRepository
+        name: freeit
+        namespace: flux-system
+  install:
+    createNamespace: true
+    remediation:
+      retries: 3
+  upgrade:
+    remediation:
+      retries: 3
+  values:
+    companyId: "${company_id}"
+    domain: "${company_domain}"

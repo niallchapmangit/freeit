@@ -1,0 +1,41 @@
+# Welcome to {{ company.company_name }}, {{ employee.first_name }}!
+
+**Start date:** {{ today.strftime("%A, %d %B %Y") }}
+**Your role:** {{ employee.job_title or employee.role.value | title }}
+**Department:** {{ employee.department or "—" }}
+{% if manager %}
+**Your manager:** {{ manager.first_name }} {{ manager.last_name }} ({{ manager.email }})
+{% endif %}
+
+---
+
+## Your first week
+
+| Day | Focus |
+|-----|-------|
+| Monday | Settle in, read the handbook, set up your tools |
+| Tuesday | 1:1 with your manager |
+| Wednesday | Meet the team |
+| Thursday | Shadow a colleague |
+| Friday | Retrospective + questions |
+
+---
+
+## Your apps
+
+{% for app in employee.apps %}
+- **{{ app | title }}**: https://{{ app }}.{{ company.company_id }}.{{ company.root_domain }}
+{% endfor %}
+- **SSO / Account**: https://auth.{{ company.company_id }}.{{ company.root_domain }}
+
+---
+
+## Need help?
+
+Reply to this document or drop a message in the team chat.
+Your IT admin can be reached at any time.
+
+---
+
+*This document was auto-generated for {{ employee.first_name }} {{ employee.last_name }}
+on {{ today.isoformat() }}.*

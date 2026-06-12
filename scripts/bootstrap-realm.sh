@@ -1,0 +1,256 @@
+#!/usr/bin/env bash
+# bootstrap-realm.sh
+#
+# Idempotent Keycloak realm setup for one company.
+# Called by bootstrap-cluster.sh after Keycloak is ready,
+# and directly by the provisioning engine (E2.1) for re-runs.
+#
+# Usage:
+#   bootstrap-realm.sh \
+#     --company-id   acme-demo \
+#     --domain       acme-demo.yourdemo.com \
+#     --keycloak-url https://auth.acme-demo.yourdemo.com \
+#     --admin-pass   <keycloak admin password>
+#
+# Creates:
+#   - Realm: <company_id>
+#   - OIDC client: nextcloud
+#   - OIDC client: mail (Roundcube/Stalwart)
+#   - OIDC client: files (Nextcloud — alias of nextcloud client if same)
+#   - Default password policy
+#   - Email settings pointing to the company SMTP (stub — E1.9 fills this in)
+
+set -euo pipefail
+
+# ── Argument parsing ──────────────────────────────────────────────────────────
+
+COMPANY_ID=""
+DOMAIN=""
+KEYCLOAK_URL=""
+ADMIN_PASS=""
+
+while [[ $# -gt 0 ]]; do
+  case $1 in
+    --company-id)   COMPANY_ID="$2";   shift 2 ;;
+    --domain)       DOMAIN="$2";       shift 2 ;;
+    --keycloak-url) KEYCLOAK_URL="$2"; shift 2 ;;
+    --admin-pass)   ADMIN_PASS="$2";   shift 2 ;;
+    *) echo "Unknown flag: $1"; exit 1 ;;
+  esac
+done
+
+[[ -z "$COMPANY_ID" || -z "$DOMAIN" || -z "$KEYCLOAK_URL" || -z "$ADMIN_PASS" ]] \
+  && { echo "Missing required arguments."; exit 1; }
+
+REALM="$COMPANY_ID"
+ADMIN_URL="${KEYCLOAK_URL}/admin/realms"
+BASE_URL="${KEYCLOAK_URL}"
+
+log() { echo "[freeit/realm] $*"; }
+
+# ── Helpers ───────────────────────────────────────────────────────────────────
+
+# Obtain an admin access token from the master realm.
+get_token() {
+  curl -sf -X POST \
+    "${BASE_URL}/realms/master/protocol/openid-connect/token" \
+    -H "Content-Type: application/x-www-form-urlencoded" \
+    -d "client_id=admin-cli" \
+    -d "username=admin" \
+    -d "password=${ADMIN_PASS}" \
+    -d "grant_type=password" \
+    | jq -r .access_token
+}
+
+# PUT is idempotent for realm and client resources.
+kc_put() {
+  local path="$1"; local body="$2"
+  curl -sf -X PUT \
+    "${ADMIN_URL}${path}" \
+    -H "Authorization: Bearer $TOKEN" \
+    -H "Content-Type: application/json" \
+    -d "$body"
+}
+
+# POST — used for resources without a natural key (users, role mappings).
+kc_post() {
+  local path="$1"; local body="$2"
+  curl -sf -X POST \
+    "${ADMIN_URL}${path}" \
+    -H "Authorization: Bearer $TOKEN" \
+    -H "Content-Type: application/json" \
+    -d "$body" || true   # 409 Conflict = already exists, that's fine
+}
+
+# GET — returns body or empty string.
+kc_get() {
+  local path="$1"
+  curl -sf \
+    "${ADMIN_URL}${path}" \
+    -H "Authorization: Bearer $TOKEN"
+}
+
+# Create or update a client. Looks up by clientId, PUTs if found, POSTs if not.
+upsert_client() {
+  local client_json="$1"
+  local client_id
+  client_id=$(echo "$client_json" | jq -r .clientId)
+
+  existing=$(kc_get "/${REALM}/clients?clientId=${client_id}" | jq -r '.[0].id // empty')
+
+  if [[ -n "$existing" ]]; then
+    log "  Updating client: $client_id"
+    kc_put "/${REALM}/clients/${existing}" "$client_json"
+  else
+    log "  Creating client: $client_id"
+    kc_post "/${REALM}/clients" "$client_json"
+  fi
+}
+
+# ── 1. Authenticate ───────────────────────────────────────────────────────────
+
+log "Authenticating with Keycloak master realm..."
+TOKEN=$(get_token)
+
+# ── 2. Create / update realm ──────────────────────────────────────────────────
+
+log "Upserting realm: $REALM"
+# Try PUT first (update if exists), then POST (create).
+REALM_JSON=$(cat <<EOF
+{
+  "realm": "${REALM}",
+  "enabled": true,
+  "displayName": "${COMPANY_ID}",
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "editUsernameAllowed": false,
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "maxFailureWaitSeconds": 900,
+  "minimumQuickLoginWaitSeconds": 60,
+  "waitIncrementSeconds": 60,
+  "quickLoginCheckMilliSeconds": 1000,
+  "maxDeltaTimeSeconds": 43200,
+  "failureFactor": 10,
+  "passwordPolicy": "length(12) and notUsername and notEmail",
+  "accessTokenLifespan": 300,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+  "smtpServer": {
+    "host": "mail.${DOMAIN}",
+    "port": "587",
+    "from": "noreply@${DOMAIN}",
+    "starttls": "true"
+  }
+}
+EOF
+)
+
+# Realm PUT path is just /{realm} at the top level, not under /admin/realms/{realm}/clients
+curl -sf -X PUT \
+  "${BASE_URL}/admin/realms/${REALM}" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "$REALM_JSON" 2>/dev/null || \
+curl -sf -X POST \
+  "${BASE_URL}/admin/realms" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d "$REALM_JSON"
+
+log "Realm ready: $REALM"
+
+# ── 3. OIDC clients ───────────────────────────────────────────────────────────
+# Each app gets its own confidential OIDC client.
+# Client secrets are generated by Keycloak and retrieved by each app's Helm values
+# via the provisioning engine (E2.2).
+
+log "Upserting OIDC clients..."
+
+# Nextcloud
+upsert_client "$(cat <<EOF
+{
+  "clientId": "nextcloud",
+  "name": "Nextcloud Files",
+  "enabled": true,
+  "protocol": "openid-connect",
+  "publicClient": false,
+  "standardFlowEnabled": true,
+  "directAccessGrantsEnabled": false,
+  "redirectUris": ["https://files.${DOMAIN}/*"],
+  "webOrigins": ["https://files.${DOMAIN}"],
+  "attributes": {
+    "pkce.code.challenge.method": "S256"
+  }
+}
+EOF
+)"
+
+# Roundcube / mail client
+upsert_client "$(cat <<EOF
+{
+  "clientId": "mail",
+  "name": "Mail",
+  "enabled": true,
+  "protocol": "openid-connect",
+  "publicClient": false,
+  "standardFlowEnabled": true,
+  "directAccessGrantsEnabled": false,
+  "redirectUris": ["https://mail.${DOMAIN}/*"],
+  "webOrigins": ["https://mail.${DOMAIN}"],
+  "attributes": {
+    "pkce.code.challenge.method": "S256"
+  }
+}
+EOF
+)"
+
+# Generic SSO portal (future onboarding surface)
+upsert_client "$(cat <<EOF
+{
+  "clientId": "portal",
+  "name": "Company Portal",
+  "enabled": true,
+  "protocol": "openid-connect",
+  "publicClient": true,
+  "standardFlowEnabled": true,
+  "directAccessGrantsEnabled": false,
+  "redirectUris": ["https://${DOMAIN}/*", "https://portal.${DOMAIN}/*"],
+  "webOrigins": ["https://${DOMAIN}", "https://portal.${DOMAIN}"]
+}
+EOF
+)"
+
+# ── 4. Default roles ──────────────────────────────────────────────────────────
+
+log "Ensuring default realm roles..."
+kc_post "/${REALM}/roles" '{"name":"employee","description":"Standard company employee"}'
+kc_post "/${REALM}/roles" '{"name":"manager","description":"People manager"}'
+kc_post "/${REALM}/roles" '{"name":"admin","description":"Company IT admin"}'
+
+# ── 5. Report client secrets ──────────────────────────────────────────────────
+# Print client secrets so bootstrap-cluster.sh / E2.2 can write them to
+# Kubernetes Secrets consumed by each app's Helm chart.
+
+log "Retrieving client secrets..."
+for client in nextcloud mail; do
+  client_id=$(kc_get "/${REALM}/clients?clientId=${client}" | jq -r '.[0].id')
+  secret=$(kc_get "/${REALM}/clients/${client_id}/client-secret" | jq -r .value)
+  log "  ${client} OIDC secret: ${secret}"
+  # Store in AWS Secrets Manager for the provisioning engine to consume.
+  aws secretsmanager put-secret-value \
+    --secret-id "freeit/${COMPANY_ID}/oidc-secret-${client}" \
+    --secret-string "$secret" \
+    --region "${AWS_REGION:-eu-west-1}" \
+    --output none 2>/dev/null || \
+  aws secretsmanager create-secret \
+    --name "freeit/${COMPANY_ID}/oidc-secret-${client}" \
+    --secret-string "$secret" \
+    --region "${AWS_REGION:-eu-west-1}" \
+    --output none
+done
+
+log "Realm bootstrap complete for: $REALM"
+log "  Auth URL : ${KEYCLOAK_URL}/realms/${REALM}"
+log "  OIDC disc: ${KEYCLOAK_URL}/realms/${REALM}/.well-known/openid-configuration"

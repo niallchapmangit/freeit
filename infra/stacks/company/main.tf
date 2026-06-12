@@ -6,6 +6,10 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
+    cloudflare = {
+      source  = "cloudflare/cloudflare"
+      version = "~> 5.0"
+    }
   }
 
   # Partial backend — completed at init time with -backend-config flags.
@@ -38,6 +42,10 @@ terraform {
 
 provider "aws" {
   region = var.region
+}
+
+provider "cloudflare" {
+  api_token = var.cloudflare_api_token
 }
 
 # ── Cloud-init user-data ──────────────────────────────────────────────────────
@@ -74,4 +82,17 @@ locals {
     one(module.substrate_aws[*].node),
     # future: one(module.substrate_hetzner[*].node),
   )
+}
+
+# ── DNS (Cloudflare) ──────────────────────────────────────────────────────────
+# Decoupled from the compute substrate — Cloudflare is always the DNS provider.
+# Creates *.{company_id}.yourdemo.com and {company_id}.yourdemo.com → node EIP.
+
+module "dns" {
+  source = "../../modules/dns-cloudflare"
+
+  company_id         = var.company_id
+  root_domain        = var.root_domain
+  node_ip            = local.node.public_ip
+  cloudflare_zone_id = var.cloudflare_zone_id
 }

@@ -1,0 +1,5 @@
+record_type,company_id,company_name,root_domain,node_size,recruiter_email,email,first_name,last_name,role,department,job_title,apps,is_onboarding_target
+company,acme-demo,Acme Corp,yourdemo.com,medium,alice@recruiter.com,,,,,,,,
+employee,acme-demo,,,,,bob@acme-demo.yourdemo.com,Bob,Smith,employee,Engineering,Software Engineer,nextcloud;mail,true
+employee,acme-demo,,,,,carol@acme-demo.yourdemo.com,Carol,Jones,manager,Engineering,Engineering Manager,nextcloud;mail,false
+employee,acme-demo,,,,,dan@acme-demo.yourdemo.com,Dan,Brown,admin,IT,IT Administrator,nextcloud;mail,false

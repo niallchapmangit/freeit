@@ -12,3 +12,13 @@ output "ssh_command" {
   description = "Ready-to-use SSH command for the node."
   value       = "ssh ${local.node.ssh_user}@${local.node.public_ip}"
 }
+
+output "company_domain" {
+  description = "The company's base domain (e.g. acme-demo.yourdemo.com)."
+  value       = module.dns.company_domain
+}
+
+output "wildcard_fqdn" {
+  description = "Wildcard DNS record covering all company subdomains."
+  value       = module.dns.wildcard_fqdn
+}

@@ -1,0 +1,28 @@
+Hi {{ employee.first_name }},
+
+Welcome to {{ company.company_name }}! Your account is ready.
+
+Log in here: https://{{ company.company_id }}.{{ company.root_domain }}
+
+YOUR APPS
+---------
+{% for app in employee.apps %}
+- {{ app | title }}: https://{{ app }}.{{ company.company_id }}.{{ company.root_domain }}
+{% endfor %}
+
+YOUR ONBOARDING PACK
+--------------------
+Find it in Files under /onboarding/{{ employee.first_name }}_{{ employee.last_name }}/
+
+{% if manager %}
+YOUR MANAGER
+------------
+{{ manager.first_name }} {{ manager.last_name }} — {{ manager.email }}
+You have a 1:1 already on your calendar.
+{% endif %}
+
+Questions? Reply to this email or reach your IT admin at
+https://auth.{{ company.company_id }}.{{ company.root_domain }}
+
+Welcome aboard,
+{{ company.company_name }} IT

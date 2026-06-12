@@ -1,4 +1,4 @@
-# Required by provisioning engine — set per company at deploy time.
+# Required — set per company by bootstrap-cluster.sh at deploy time.
 companyId: ""
 domain: ""
 
@@ -7,14 +7,19 @@ ingress:
 
 keycloak:
   auth:
-    # adminPassword must be injected at deploy time — never committed.
-    # Set via: --set keycloak.auth.adminPassword=$KEYCLOAK_ADMIN_PASS
     adminUser: admin
-    adminPassword: ""
+    # adminPassword injected from the keycloak-secrets Secret at deploy time.
+    existingSecret: keycloak-secrets
+    passwordSecretKey: admin-password
+
+  production: true
+  proxy: edge   # TLS terminated at ingress-nginx
 
   ingress:
     enabled: true
     ingressClassName: nginx
+    annotations:
+      nginx.ingress.kubernetes.io/proxy-buffer-size: "128k"
     hostname: "auth.{{ .Values.domain }}"
     tls: true
     extraTls:
@@ -25,8 +30,10 @@ keycloak:
   postgresql:
     enabled: true
     auth:
-      # postgresPassword injected at deploy time.
-      postgresPassword: ""
+      existingSecret: keycloak-secrets
+      secretKeys:
+        adminPasswordKey: postgres-password
+        userPasswordKey: postgres-user-password
 
   resources:
     requests:
@@ -35,5 +42,8 @@ keycloak:
     limits:
       memory: 1Gi
 
-  # Realm and client config is handled by the provisioning engine post-deploy (E2.2).
-  # Do not pre-bake realm JSON here.
+  # Realm + client config is handled by bootstrap-realm.sh post-deploy.
+  # Do not pre-bake realm JSON here — it changes per company.
+  extraEnvVars:
+    - name: KC_FEATURES
+      value: "token-exchange,admin-fine-grained-authz"
