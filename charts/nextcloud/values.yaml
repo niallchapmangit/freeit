@@ -6,7 +6,7 @@ ingress:
   tlsSecret: wildcard-tls
 
 nextcloud:
-  host: "files.{{ .Values.domain }}"
+  host: ""
 
   # Admin credentials injected from nextcloud-secrets at deploy time.
   existingSecret:
@@ -54,10 +54,7 @@ nextcloud:
       nginx.ingress.kubernetes.io/proxy-body-size: "10g"
       nginx.ingress.kubernetes.io/proxy-buffering: "off"
       nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
-    tls:
-      - secretName: "{{ .Values.ingress.tlsSecret }}"
-        hosts:
-          - "files.{{ .Values.domain }}"
+    tls: []
 
   # PostgreSQL subchart
   postgresql:

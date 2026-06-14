@@ -20,12 +20,9 @@ keycloak:
     ingressClassName: nginx
     annotations:
       nginx.ingress.kubernetes.io/proxy-buffer-size: "128k"
-    hostname: "auth.{{ .Values.domain }}"
+    hostname: ""
     tls: true
-    extraTls:
-      - hosts:
-          - "auth.{{ .Values.domain }}"
-        secretName: "{{ .Values.ingress.tlsSecret }}"
+    extraTls: []
 
   postgresql:
     enabled: true

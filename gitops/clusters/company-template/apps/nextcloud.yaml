@@ -27,5 +27,5 @@ spec:
     remediation:
       retries: 3
   values:
-    companyId: "${company_id}"
-    domain: "${company_domain}"
+    companyId: "COMPANY_ID"
+    domain: "COMPANY_DOMAIN"
