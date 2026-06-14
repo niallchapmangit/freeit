@@ -1,0 +1,88 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak
+  namespace: keycloak
+spec:
+  selector:
+    app: keycloak
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: keycloak
+  namespace: keycloak
+spec:
+  serviceName: keycloak
+  replicas: 1
+  selector:
+    matchLabels:
+      app: keycloak
+  template:
+    metadata:
+      labels:
+        app: keycloak
+        freeit/company: {{ .Values.companyId | quote }}
+    spec:
+      initContainers:
+        - name: wait-for-postgres
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - until nc -z keycloak-postgresql 5432; do echo waiting for postgres; sleep 2; done
+      containers:
+        - name: keycloak
+          image: {{ .Values.keycloak.image }}
+          args: [start]
+          env:
+            - name: KC_DB
+              value: postgres
+            - name: KC_DB_URL
+              value: jdbc:postgresql://keycloak-postgresql:5432/keycloak
+            - name: KC_DB_USERNAME
+              value: keycloak
+            - name: KC_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-secrets
+                  key: postgres-user-password
+            - name: KEYCLOAK_ADMIN
+              value: admin
+            - name: KEYCLOAK_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-secrets
+                  key: admin-password
+            - name: KC_HOSTNAME
+              value: {{ printf "auth.%s" .Values.domain | quote }}
+            - name: KC_PROXY_HEADERS
+              value: xforwarded
+            - name: KC_HTTP_ENABLED
+              value: "true"
+            - name: KC_HOSTNAME_STRICT
+              value: "false"
+            - name: KC_FEATURES
+              value: "token-exchange,admin-fine-grained-authz"
+          ports:
+            - containerPort: 8080
+          resources:
+            {{- toYaml .Values.keycloak.resources | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 9000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 9000
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            failureThreshold: 4

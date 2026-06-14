@@ -1,36 +1,8 @@
-# Required — set per company by bootstrap-cluster.sh at deploy time.
 companyId: ""
 domain: ""
 
-ingress:
-  tlsSecret: wildcard-tls
-
 keycloak:
-  image:
-    registry: registry.bitnami.com
-
-  auth:
-    adminUser: admin
-    # adminPassword injected from the keycloak-secrets Secret at deploy time.
-    existingSecret: keycloak-secrets
-    passwordSecretKey: admin-password
-
-  production: true
-  proxy: edge   # TLS terminated at ingress-nginx
-
-  ingress:
-    enabled: false
-
-  postgresql:
-    enabled: true
-    image:
-      registry: registry.bitnami.com
-    auth:
-      existingSecret: keycloak-secrets
-      secretKeys:
-        adminPasswordKey: postgres-password
-        userPasswordKey: postgres-user-password
-
+  image: quay.io/keycloak/keycloak:26.1.0
   resources:
     requests:
       cpu: 250m
@@ -38,8 +10,12 @@ keycloak:
     limits:
       memory: 1Gi
 
-  # Realm + client config is handled by bootstrap-realm.sh post-deploy.
-  # Do not pre-bake realm JSON here — it changes per company.
-  extraEnvVars:
-    - name: KC_FEATURES
-      value: "token-exchange,admin-fine-grained-authz"
+postgresql:
+  image: postgres:16-alpine
+  storage: 5Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
