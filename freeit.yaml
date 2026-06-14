@@ -19,7 +19,7 @@
 root_domain: "free-it-infra.com"
 
 # Your Cloudflare zone ID — found on the right sidebar of your domain in the Cloudflare dashboard.
-cloudflare_zone_id: ""
+cloudflare_zone_id: "31634d8a91d5f9f7f5e769c2c358314d"
 
 # ── Cloud / State ─────────────────────────────────────────────────────────────
 # AWS region for the state bucket and default node provisioning. Must be EU.
