@@ -68,6 +68,8 @@ spec:
               value: "false"
             - name: KC_FEATURES
               value: "token-exchange,admin-fine-grained-authz"
+            - name: KC_HEALTH_ENABLED
+              value: "true"
           ports:
             - containerPort: 8080
           resources:
@@ -75,14 +77,7 @@ spec:
           readinessProbe:
             httpGet:
               path: /health/ready
-              port: 9000
-            initialDelaySeconds: 30
+              port: 8080
+            initialDelaySeconds: 45
             periodSeconds: 10
-            failureThreshold: 6
-          livenessProbe:
-            httpGet:
-              path: /health/live
-              port: 9000
-            initialDelaySeconds: 60
-            periodSeconds: 15
-            failureThreshold: 4
+            failureThreshold: 12
