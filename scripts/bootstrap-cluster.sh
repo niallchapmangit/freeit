@@ -102,7 +102,7 @@ secret_get_or_create() {
     local value
     value=$(openssl rand -base64 32 | tr -d '=+/' | cut -c1-32)
     aws secretsmanager create-secret --name "$secret_id" \
-      --secret-string "$value" --region "$AWS_REGION" --output none
+      --secret-string "$value" --region "$AWS_REGION" >/dev/null
     echo "$value"
   fi
 }
@@ -148,7 +148,7 @@ $SSH "
 # All secrets must exist before HelmReleases that reference them are applied.
 
 log "Creating namespaces..."
-for ns in ingress-nginx flux-system keycloak nextcloud; do
+for ns in ingress-nginx flux-system keycloak nextcloud cert-manager; do
   $SSH "k3s kubectl create namespace $ns --dry-run=client -o yaml | k3s kubectl apply -f -"
 done
 
@@ -204,10 +204,17 @@ $SSH "k3s kubectl create secret generic freeit-deploy-key \
 # ── 8. Bootstrap Flux ─────────────────────────────────────────────────────────
 
 log "Bootstrapping Flux..."
-$SSH "flux install --version=${FLUX_VERSION} \
+$SSH "KUBECONFIG=/etc/rancher/k3s/k3s.yaml flux install --version=v${FLUX_VERSION} \
   --namespace=flux-system \
-  --components-extra=image-reflector-controller,image-automation-controller \
-  2>&1 | tail -5"
+  --components-extra=image-reflector-controller,image-automation-controller"
+
+log "Waiting for Flux CRDs to be established..."
+$SSH "k3s kubectl wait --for=condition=Established \
+  crd/helmreleases.helm.toolkit.fluxcd.io \
+  crd/gitrepositories.source.toolkit.fluxcd.io \
+  crd/kustomizations.kustomize.toolkit.fluxcd.io \
+  crd/helmrepositories.source.toolkit.fluxcd.io \
+  --timeout=120s"
 
 # ── 9. Generate and apply per-company cluster manifests ───────────────────────
 
@@ -219,9 +226,18 @@ TEMPLATE_DIR="$SCRIPT_DIR/../gitops/clusters/company-template"
 
 cp -r "$TEMPLATE_DIR" "$MANIFEST_DIR"
 
+# Flux requires ssh:// URL format — convert git@github.com:org/repo to ssh://git@github.com/org/repo
+FLUX_REPO_URL=$(python3 -c "
+url = '${REPO_URL}'
+if url.startswith('git@') and ':' in url:
+    host, path = url[4:].split(':', 1)
+    url = f'ssh://git@{host}/{path}'
+print(url)
+")
+
 find "$MANIFEST_DIR" -type f | xargs sed -i.bak \
   -e "s|COMPANY_ID|$COMPANY_ID|g" \
-  -e "s|REPO_URL|$REPO_URL|g" \
+  -e "s|REPO_URL|$FLUX_REPO_URL|g" \
   -e "s|COMPANY_DOMAIN|$DOMAIN|g"
 find "$MANIFEST_DIR" -name '*.bak' -delete
 
@@ -231,7 +247,7 @@ $SSH "k3s kubectl apply -k /tmp/freeit-cluster-manifests && rm -rf /tmp/freeit-c
 # ── 10. Wait for Flux reconciliation ──────────────────────────────────────────
 
 log "Waiting for Flux to reconcile (may take 3-5 min)..."
-$SSH "flux reconcile kustomization freeit-${COMPANY_ID} --with-source --timeout=10m"
+$SSH "KUBECONFIG=/etc/rancher/k3s/k3s.yaml flux reconcile kustomization freeit-${COMPANY_ID} --with-source --timeout=10m"
 
 # ── 11. Bootstrap Keycloak realm ──────────────────────────────────────────────
 # Waits for Keycloak to be ready then runs bootstrap-realm.sh.

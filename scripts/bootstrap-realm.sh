@@ -243,12 +243,12 @@ for client in nextcloud mail; do
     --secret-id "freeit/${COMPANY_ID}/oidc-secret-${client}" \
     --secret-string "$secret" \
     --region "${AWS_REGION:-eu-west-1}" \
-    --output none 2>/dev/null || \
+    >/dev/null 2>/dev/null || \
   aws secretsmanager create-secret \
     --name "freeit/${COMPANY_ID}/oidc-secret-${client}" \
     --secret-string "$secret" \
     --region "${AWS_REGION:-eu-west-1}" \
-    --output none
+    >/dev/null
 done
 
 log "Realm bootstrap complete for: $REALM"

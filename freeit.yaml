@@ -19,7 +19,7 @@
 root_domain: "free-it-infra.com"
 
 # Your Cloudflare zone ID — found on the right sidebar of your domain in the Cloudflare dashboard.
-cloudflare_zone_id: ""
+cloudflare_zone_id: "31634d8a91d5f9f7f5e769c2c358314d"
 
 # ── Cloud / State ─────────────────────────────────────────────────────────────
 # AWS region for the state bucket and default node provisioning. Must be EU.
@@ -35,18 +35,18 @@ ssh_public_key: "~/.ssh/freeit_ed25519.pub"
 
 # CIDR(s) allowed to SSH into nodes (port 22). Comma-separated.
 # Use your office/VPN egress IP. Never 0.0.0.0/0.
-ssh_cidrs: ""
+ssh_cidrs: "79.112.29.24/32"
 
 # CIDR(s) allowed to reach the k3s API (port 6443). Same restriction applies.
-api_cidrs: ""
+api_cidrs: "79.112.29.24/32"
 
 # Default SSH user for the cloud image. Ubuntu images use "ubuntu".
 ssh_user: "ubuntu"
 
 # ── Git / Flux ────────────────────────────────────────────────────────────────
 # Git remote URL for this repo (used by Flux to pull GitOps manifests).
-# Use SSH format so the deploy key is used: git@github.com:org/freeit.git
-repo_url: ""
+# Use SCP-style SSH format — the bootstrap script converts it to ssh:// for Flux automatically.
+repo_url: "git@github.com:niallchapmangit/freeit.git"
 
 # Path to the SSH deploy key registered in GitHub as a read-only deploy key.
 deploy_key: "~/.ssh/freeit_deploy_ed25519"

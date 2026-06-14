@@ -62,7 +62,8 @@ provider "acme" {
 # ── ACME account key ──────────────────────────────────────────────────────────
 
 resource "tls_private_key" "acme_account" {
-  algorithm = "ED25519"
+  algorithm = "RSA"
+  rsa_bits  = 4096
 }
 
 resource "acme_registration" "freeit" {

@@ -1,0 +1,33 @@
+---
+# GitRepository — tells Flux where to pull manifests from.
+# niall-demo and ssh://git@github.com/niallchapmangit/freeit.git are replaced by the deploy-trigger script.
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: freeit
+  namespace: flux-system
+spec:
+  interval: 5m
+  url: ssh://git@github.com/niallchapmangit/freeit.git          # replaced at deploy time
+  ref:
+    branch: main
+  secretRef:
+    name: freeit-deploy-key
+---
+# Root Kustomization — reconciles everything under this company's cluster dir.
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: freeit-niall-demo
+  namespace: flux-system
+spec:
+  interval: 10m
+  path: ./gitops/clusters/niall-demo
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: freeit
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: company-vars

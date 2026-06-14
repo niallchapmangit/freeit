@@ -127,7 +127,7 @@ for user_email in $USERS; do
     --name "$secret_id" \
     --secret-string "$app_pass" \
     --region "$AWS_REGION" \
-    --output none
+    >/dev/null
   log "  [ok] app password stored for $user_email"
 done
 
