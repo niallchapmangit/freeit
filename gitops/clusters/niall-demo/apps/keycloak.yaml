@@ -28,3 +28,10 @@ spec:
   values:
     companyId: "niall-demo"
     domain: "niall-demo.free-it-infra.com"
+    keycloak:
+      ingress:
+        hostname: "auth.niall-demo.free-it-infra.com"
+        extraTls:
+          - hosts:
+              - "auth.niall-demo.free-it-infra.com"
+            secretName: wildcard-tls

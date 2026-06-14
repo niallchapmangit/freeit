@@ -28,3 +28,10 @@ spec:
   values:
     companyId: "COMPANY_ID"
     domain: "COMPANY_DOMAIN"
+    keycloak:
+      ingress:
+        hostname: "auth.COMPANY_DOMAIN"
+        extraTls:
+          - hosts:
+              - "auth.COMPANY_DOMAIN"
+            secretName: wildcard-tls
