@@ -2,6 +2,5 @@ dependencies:
 - name: nextcloud
   repository: https://nextcloud.github.io/helm/
   version: 4.6.6
-digest: sha256:placeholder-run-helm-dependency-update-to-regenerate
-generated: "2026-06-12T00:00:00.000000000Z"
-# NOTE: Run `helm dependency update charts/nextcloud` before first deploy.
+digest: sha256:ffc57587b66cbffbee06e7c230b784a112e81bd506be2e470c7f13e0f233868e
+generated: "2026-06-14T15:07:30.571341+02:00"
